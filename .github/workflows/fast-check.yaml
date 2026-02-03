@@ -4,9 +4,9 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
-# Only run the most recent workflow
+# Only run the most recent workflow for this PR
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: fast-checks-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -20,9 +20,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6.0.1
         with:
-          # Important: use the PR head ref to commit back to the PR branch
           ref: ${{ github.head_ref }}
-          persist-credentials: true
+          # Use a PAT or github token with workflow permissions to trigger CI
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
@@ -61,11 +62,31 @@ jobs:
 
       - name: Commit auto-fixes
         if: steps.changes.outputs.changed == 'true'
+        id: commit
         uses: stefanzweifel/git-auto-commit-action@v7.1.0
         with:
-          commit_message: "style: auto-fix ruff format and lint issues"
+          commit_message: "style: auto-fix ruff format and lint issues [skip ci]"
           commit_user_name: "github-actions[bot]"
           commit_user_email: "github-actions[bot]@users.noreply.github.com"
+          skip_dirty_check: false
+
+      - name: Trigger CI workflow after auto-fix
+        if: steps.changes.outputs.changed == 'true' && steps.commit.outputs.changes_detected == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Wait a moment for the commit to be processed
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Trigger workflow by creating a repository dispatch or updating PR
+            // This will cause the PR to synchronize and re-trigger workflows
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              body: context.payload.pull_request.body || ''
+            });
 
       - name: Notify user about auto-fix
         if: steps.changes.outputs.changed == 'true'
@@ -76,26 +97,26 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `
-                  ## ✅ Auto-fix Applied
+              body: `## ✅ Auto-fix Applied
 
-                  **Ruff has automatically fixed formatting and linting issues.**
+            **Ruff has automatically fixed formatting and linting issues.**
 
-                  ### What happened?
-                  - 🎨 Code formatting applied (ruff format)
-                  - 🔧 Auto-fixable lint issues resolved (ruff check --fix)
+            ### What happened?
+            - 🎨 Code formatting applied (ruff format)
+            - 🔧 Auto-fixable lint issues resolved (ruff check --fix)
+            - 🔄 CI checks will restart automatically
 
-                  ### What you need to do:
-                  Please pull the latest changes to your local branch:
-                  ~~~bash
-                  git pull --rebase
-                  ~~~
+            ### What you need to do:
+            Please pull the latest changes to your local branch:
+            ~~~bash
+            git pull --rebase
+            ~~~
 
-                  ### Next steps:
-                  - The CI pipeline will now run pre-commit checks and tests
-                  - If all checks pass, your PR will be ready for review
-                `,
-              })
+            ### Next steps:
+            - The CI pipeline is restarting with the fixed code
+            - If all checks pass, your PR will be ready for review`
+            })
+
       - name: Re-run format check
         if: steps.changes.outputs.changed == 'true'
         run: |
@@ -120,12 +141,12 @@ jobs:
         if: steps.changes.outputs.changed == 'false'
         run: |
           if ! ruff check --output-format=github .; then
-            echo "::error::Lint check failed after auto-fix. Manual intervention required."
+            echo "::error::Lint check failed but could not be auto-fixed. Manual intervention required."
             exit 1
           fi
 
-      - name: Notify user about auto-fix
-        if: steps.changes.outputs.changed == 'true'
+      - name: Notify user about manual fix needed
+        if: failure()
         uses: actions/github-script@v7
         with:
           script: |
@@ -133,37 +154,44 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `
-                  ## ⚠️ Auto-fix Failed
+              body: `## ⚠️ Auto-fix Failed
 
-                  **Some issues require manual intervention.**
+            **Some issues require manual intervention.**
 
-                  ### What you need to do:
-                  Please run the following commands locally:
-                  ~~~bash
-                  # Format your code
-                  ruff format .
+            ### What you need to do:
+            Please run the following commands locally:
+            ~~~bash
+            # Format your code
+            ruff format .
 
-                  # Fix linting issues
-                  ruff check --fix .
+            # Fix linting issues
+            ruff check --fix .
 
-                  # Check for remaining issues
-                  ruff check .
+            # Check for remaining issues
+            ruff check .
 
-                  # Commit and push
-                  git add .
-                  git commit -m "fix: resolve ruff format and lint issues"
-                  git push
-                  ~~~
+            # Commit and push
+            git add .
+            git commit -m "fix: resolve ruff format and lint issues"
+            git push
+            ~~~
 
-                  ### Alternative: Use pre-commit hooks
-                  Install pre-commit hooks to catch these issues before pushing:
-                  ~~~bash
-                  pip install pre-commit
-                  pre-commit install
-                  pre-commit run --all-files
-                  ~~~
+            ### Alternative: Use pre-commit hooks
+            Install pre-commit hooks to catch these issues before pushing:
+            ~~~bash
+            pip install pre-commit
+            pre-commit install
+            pre-commit run --all-files
+            ~~~
 
-                  After fixing locally, push your changes and this check will re-run automatically.
-                `,
-              })
+            After fixing locally, push your changes and this check will re-run automatically.`
+            })
+
+      # Signal completion for workflow dependencies
+      - name: Mark fast-checks complete
+        if: always()
+        run: |
+          echo "Fast checks completed with status: ${{ job.status }}"
+          if [[ "${{ job.status }}" != "success" ]]; then
+            exit 1
+          fi
