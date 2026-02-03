@@ -22,6 +22,7 @@ dev = [
 ]
 tests = [
     "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
 ]
 type-checks = [
     "mypy>=1.19.1",
