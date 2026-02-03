@@ -397,6 +397,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install -U pip uv
+          export UV_PROJECT_ENVIRONMENT=$(python -c 'import sys; print(sys.prefix)')
           uv sync --no-dev --group type-checks
 
       - name: Run mypy with annotations
@@ -439,6 +440,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install -U pip uv
+          export UV_PROJECT_ENVIRONMENT=$(python -c 'import sys; print(sys.prefix)')
           uv sync --group tests --no-dev
 
       - name: Run tests with coverage
