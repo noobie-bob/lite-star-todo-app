@@ -87,8 +87,8 @@ jobs:
 
       - name: Push auto-fixes to PR
         if: |
-          steps.changes.outputs.changed == 'true' && 
-          steps.format_verify.outcome == 'success' && 
+          steps.changes.outputs.changed == 'true' &&
+          steps.format_verify.outcome == 'success' &&
           steps.lint_verify.outcome == 'success'
         run: |
           echo "Ruff fixes verified successfully, pushing to PR..."
@@ -96,8 +96,8 @@ jobs:
 
       - name: Trigger workflow restart after auto-fix
         if: |
-          steps.changes.outputs.changed == 'true' && 
-          steps.format_verify.outcome == 'success' && 
+          steps.changes.outputs.changed == 'true' &&
+          steps.format_verify.outcome == 'success' &&
           steps.lint_verify.outcome == 'success'
         uses: actions/github-script@v7
         with:
@@ -105,14 +105,14 @@ jobs:
           script: |
             // Wait for push to be processed
             await new Promise(resolve => setTimeout(resolve, 3000));
-            
+
             // The push itself will trigger workflow restart via 'synchronize' event
             console.log('Auto-fix pushed successfully. Workflows will restart automatically.');
 
       - name: Notify user about auto-fix
         if: |
-          steps.changes.outputs.changed == 'true' && 
-          steps.format_verify.outcome == 'success' && 
+          steps.changes.outputs.changed == 'true' &&
+          steps.format_verify.outcome == 'success' &&
           steps.lint_verify.outcome == 'success'
         uses: actions/github-script@v7
         with:
@@ -160,8 +160,8 @@ jobs:
 
       - name: Notify user about verification failure
         if: |
-          failure() && 
-          steps.changes.outputs.changed == 'true' && 
+          failure() &&
+          steps.changes.outputs.changed == 'true' &&
           (steps.format_verify.outcome == 'failure' || steps.lint_verify.outcome == 'failure')
         uses: actions/github-script@v7
         with:
