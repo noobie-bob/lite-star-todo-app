@@ -2,45 +2,64 @@ name: CI Pipeline
 on: [push, pull_request]
 
 jobs:
-    ruff-format:
+    ruff:
         runs-on: ubuntu-latest
         permissions:
             contents: write
+            pull-requests: write
         steps:
             # Checkout the repository
             - name: Checkout repository
               uses: actions/checkout@v6.0.1
               with:
-                ref: ${{ github.head_ref }}
                 # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
                 persist-credentials: true
-            - name: Ruff formatting
-              uses: astral-sh/ruff-action@v3.6.1
+            # Set up Python
+            - name: Set up Python
+              uses: actions/setup-python@v6.2.0
               with:
-                args: "format ."
-            - name: Git Format Auto Commit
-              uses: stefanzweifel/git-auto-commit-action@v7.1.0
+                python-version: "3.13"
+            - name: Cache uv and pip
+              uses: actions/cache@v5.0.3
               with:
-                commit_message: "style: auto-fix format issues" 
-    ruff-lint:
-        needs: ruff-format
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write
-        steps:
-            # Checkout the repository
-            - name: Checkout repository
-              uses: actions/checkout@v6.0.1
-              with:
-                ref: ${{ github.head_ref }}
-                # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
-                persist-credentials: true
-            # Lint with Ruff
+                path: |
+                  ~/.cache/uv
+                key: uv-pip-${{ runner.os }}-${{ hashFiles('**/uv.lock', '**/pyproject.toml') }}
+                restore-keys: |
+                  uv-pip-${{ runner.os }}-
+            - name: Install uv and ruff
+              run: |
+                  python -m pip install -U pip uv \
+                    && uv sync --no-dev && uv pip install ruff mypy
+            - name: Format with Ruff
+              run: ruff format .
             - name: Lint with Ruff
-              uses: astral-sh/ruff-action@v3.6.1
+              run: ruff check --fix --output-format=github .            
+            - name: Check for changes
+              id: changes
+              run: |
+                if git diff --quiet; then
+                  echo "changed=false" >> "$GITHUB_OUTPUT"
+                else
+                  echo "changed=true" >> "$GITHUB_OUTPUT"
+                fi
+            - name: Cache mypy cache
+              uses: actions/cache@v5.0.3
               with:
-                args: "check --fix --output-format=github ."
-            - name: Git Lint Auto Commit
+                path: .mypy_cache
+                key: mypy-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/*.py') }}
+                restore-keys: |
+                  mypy-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-
+            - name: Run mypy
+              run: mypy --incremental --show-error-codes --pretty src
+            - name: Git Auto Commit   
+              if: ${{ github.event_name == 'push' && steps.changes.outputs.changed == 'true' }}                         
               uses: stefanzweifel/git-auto-commit-action@v7.1.0
               with:
-                commit_message: "style: auto-fix lint issues" 
+                commit_message: "style: auto-fix lint/format issues" 
+            - name: Add PR comment on Update
+              if: ${{ github.event_name == 'pull_request' && steps.changes.outputs.changed == 'true' }}
+              uses: mshick/add-pr-comment@v2
+              with:
+                message: |
+                  **Ruff auto-fix with lint/format has been done, please perform git pull locally**
