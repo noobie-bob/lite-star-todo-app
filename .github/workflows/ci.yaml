@@ -29,14 +29,14 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const ref = context.payload.pull_request.head.sha;
-            
+
             console.log(`Waiting for fast-checks workflow on commit ${ref}`);
-            
+
             // Wait up to 10 minutes for fast-checks to complete
             const maxWaitTime = 10 * 60 * 1000; // 10 minutes
             const pollInterval = 10000; // 10 seconds
             const startTime = Date.now();
-            
+
             while (Date.now() - startTime < maxWaitTime) {
               // Get all workflow runs for this commit
               const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
@@ -71,7 +71,7 @@ jobs:
               // Wait before polling again
               await new Promise(resolve => setTimeout(resolve, pollInterval));
             }
-            
+
             console.log('⏱️ Timeout waiting for fast-checks - continuing with CI');
 
       - name: Check for new commits
@@ -80,17 +80,17 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const prNumber = context.payload.pull_request.number;
-            
+
             // Get the latest PR data
             const { data: pr } = await github.rest.pulls.get({
               owner,
               repo,
               pull_number: prNumber
             });
-            
+
             const currentSha = context.payload.pull_request.head.sha;
             const latestSha = pr.head.sha;
-            
+
             if (currentSha !== latestSha) {
               console.log(`New commits detected. Current: ${currentSha}, Latest: ${latestSha}`);
               console.log('This workflow run is outdated and will be cancelled by concurrency group');
@@ -117,12 +117,14 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          sparse-checkout: |
+            !.github/workflows/
 
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.13"
-          cache: 'pip'
+          cache: "pip"
 
       - name: Cache pre-commit
         uses: actions/cache@v4
@@ -146,45 +148,22 @@ jobs:
         run: |
           if git diff --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No changes detected after pre-commit"
+            echo "No file changes detected after pre-commit"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Changes detected after pre-commit:"
+            echo "File changes detected after pre-commit:"
             git diff --stat
           fi
 
-      - name: Commit pre-commit auto-fixes
-        if: steps.precommit_first.outcome == 'failure' && steps.changes_first.outputs.changed == 'true' && github.event_name == 'pull_request'
-        id: commit
-        uses: stefanzweifel/git-auto-commit-action@v7.1.0
-        with:
-          commit_message: "style: auto-fix pre-commit issues [skip ci]"
-          commit_user_name: "github-actions[bot]"
-          commit_user_email: "github-actions[bot]@users.noreply.github.com"
-
-      - name: Trigger workflow restart after auto-fix
-        if: steps.precommit_first.outcome == 'failure' && steps.changes_first.outputs.changed == 'true' && steps.commit.outputs.changes_detected == 'true' && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            // Wait for commit to be processed
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // Trigger re-run by updating PR
-            await github.rest.pulls.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-              body: context.payload.pull_request.body || ''
-            });
-
-      - name: Fail on push events if pre-commit made changes
-        if: steps.precommit_first.outcome == 'failure' && steps.changes_first.outputs.changed == 'true' && github.event_name == 'push'
+      - name: Commit changes locally (not pushed yet)
+        id: local_commit
+        if: steps.precommit_first.outcome == 'failure' && steps.changes_first.outputs.changed == 'true'
         run: |
-          echo "::error::Pre-commit checks failed on push to protected branch. Pre-commit hooks must be run before pushing."
-          echo "::error::Please run 'pre-commit run --all-files' locally and commit the fixes."
-          exit 1
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "style: auto-fix pre-commit issues"
+          echo "Local commit created, not pushed yet"
 
       - name: Run pre-commit (second attempt - verification)
         id: precommit_second
@@ -194,8 +173,52 @@ jobs:
           echo "Re-running pre-commit to verify fixes..."
           pre-commit run --all-files --show-diff-on-failure
 
+      - name: Check if second run made additional changes
+        id: changes_second
+        if: steps.precommit_second.outcome == 'failure'
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No additional changes after second pre-commit run"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Additional changes detected - this means pre-commit is still failing"
+            git diff --stat
+          fi
+
+      # Case 1: Pre-commit fixed issues successfully (second run passed)
+      - name: Push auto-fixes to PR
+        if: |
+          github.event_name == 'pull_request' && 
+          steps.precommit_first.outcome == 'failure' && 
+          steps.changes_first.outputs.changed == 'true' && 
+          steps.precommit_second.outcome == 'success'
+        run: |
+          echo "Pre-commit fixes verified successfully, pushing to PR..."
+          git push origin HEAD:${{ github.head_ref }}
+
+      - name: Trigger workflow restart after successful auto-fix
+        if: |
+          github.event_name == 'pull_request' && 
+          steps.precommit_first.outcome == 'failure' && 
+          steps.changes_first.outputs.changed == 'true' && 
+          steps.precommit_second.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Wait for push to be processed
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // The push itself will trigger the workflow via 'synchronize' event
+            console.log('Auto-fix pushed successfully. Workflow will restart automatically.');
+
       - name: Notify user about successful auto-fix
-        if: steps.precommit_first.outcome == 'failure' && steps.changes_first.outputs.changed == 'true' && steps.precommit_second.outcome == 'success' && github.event_name == 'pull_request'
+        if: |
+          github.event_name == 'pull_request' && 
+          steps.precommit_first.outcome == 'failure' && 
+          steps.changes_first.outputs.changed == 'true' && 
+          steps.precommit_second.outcome == 'success'
         uses: actions/github-script@v7
         with:
           script: |
@@ -209,7 +232,7 @@ jobs:
 
             ### What happened?
             - 🔧 Pre-commit hooks ran and fixed auto-fixable issues
-            - ✅ Changes have been committed to your PR branch
+            - ✅ Changes have been verified and pushed to your PR branch
             - 🔄 CI checks are restarting automatically
 
             ### What you need to do:
@@ -220,22 +243,37 @@ jobs:
 
             ### Next steps:
             - Your PR has been updated with the fixes
-            - The CI pipeline will continue with the remaining checks
+            - The CI pipeline will restart with the fixed code
             - All checks should pass now ✨`
             })
 
+      # Case 2: Pre-commit made changes but still failing (or no changes but failing)
       - name: Notify user about manual fix needed
-        if: steps.precommit_first.outcome == 'failure' && (steps.changes_first.outputs.changed == 'false' || steps.precommit_second.outcome == 'failure') && github.event_name == 'pull_request'
+        if: |
+          github.event_name == 'pull_request' && 
+          steps.precommit_first.outcome == 'failure' && 
+          (steps.changes_first.outputs.changed == 'false' || 
+           (steps.precommit_second.outcome == 'failure' && steps.changes_second.outputs.changed == 'false'))
         uses: actions/github-script@v7
         with:
           script: |
+            const madeChanges = '${{ steps.changes_first.outputs.changed }}' === 'true';
+            const stillFailing = '${{ steps.precommit_second.outcome }}' === 'failure';
+
+            let explanation = '';
+            if (madeChanges && stillFailing) {
+              explanation = '**Pre-commit made some fixes, but is still failing without making additional changes.**\nThis means there are issues that cannot be auto-fixed.';
+            } else {
+              explanation = '**Pre-commit found issues but could not auto-fix them.**';
+            }
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `## ⚠️ Pre-commit Checks Failed - Manual Fix Required
 
-            **Some pre-commit issues require manual intervention.**
+            ${explanation}
 
             ### What you need to do:
 
@@ -250,12 +288,14 @@ jobs:
             # Run on all files
             pre-commit run --all-files
 
-            # Review the changes
+            # Review the changes and errors
             git diff
 
-            # Commit the fixes
+            # If there are changes, commit them
             git add .
             git commit -m "fix: resolve pre-commit issues"
+
+            # If there are still errors, fix them manually and commit
             git push
             ~~~
 
@@ -267,7 +307,7 @@ jobs:
             # Fix linting issues
             ruff check --fix .
 
-            # Run mypy
+            # Run mypy and fix type errors manually
             mypy src
 
             # Commit and push
@@ -286,8 +326,71 @@ jobs:
             Check the pre-commit output above for specific errors, or ask a maintainer for assistance.`
             })
 
+      # Case 3: Pre-commit made changes and is still making more changes (infinite loop detection)
+      - name: Notify about infinite loop
+        if: |
+          github.event_name == 'pull_request' && 
+          steps.precommit_first.outcome == 'failure' && 
+          steps.changes_first.outputs.changed == 'true' && 
+          steps.precommit_second.outcome == 'failure' && 
+          steps.changes_second.outputs.changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🔄 Pre-commit Auto-fix Loop Detected
+
+            **Pre-commit keeps making changes on each run.**
+
+            This usually indicates:
+            - Conflicting formatter settings
+            - Non-deterministic formatters
+            - Pre-commit hooks that need configuration updates
+
+            ### What you need to do:
+
+            1. **Run pre-commit locally multiple times:**
+               ~~~bash
+               pip install pre-commit
+               pre-commit install
+               
+               # Run multiple times until stable
+               pre-commit run --all-files
+               pre-commit run --all-files
+               pre-commit run --all-files
+               ~~~
+
+            2. **Check for conflicting configurations:**
+               - Review \`.pre-commit-config.yaml\`
+               - Check \`pyproject.toml\` formatter settings
+               - Ensure ruff and other tools have compatible configs
+
+            3. **Commit the final state:**
+               ~~~bash
+               git add .
+               git commit -m "fix: resolve pre-commit issues"
+               git push
+               ~~~
+
+            ### Need help?
+            Please ask a maintainer to review the pre-commit configuration.`
+            })
+
+      - name: Fail on push events if pre-commit failed
+        if: steps.precommit_first.outcome == 'failure' && github.event_name == 'push'
+        run: |
+          echo "::error::Pre-commit checks failed on push to protected branch."
+          echo "::error::Please run 'pre-commit run --all-files' locally and commit the fixes before pushing."
+          exit 1
+
       - name: Fail if pre-commit issues remain
-        if: steps.precommit_first.outcome == 'failure' && (steps.changes_first.outputs.changed == 'false' || steps.precommit_second.outcome == 'failure')
+        if: |
+          steps.precommit_first.outcome == 'failure' && 
+          (steps.changes_first.outputs.changed == 'false' || 
+           steps.precommit_second.outcome == 'failure')
         run: |
           echo "::error::Pre-commit checks failed and could not be auto-fixed. Please fix manually."
           exit 1
@@ -309,7 +412,7 @@ jobs:
         uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.13"
-          cache: 'pip'
+          cache: "pip"
 
       - name: Cache uv
         uses: actions/cache@v4
@@ -354,7 +457,7 @@ jobs:
         uses: actions/setup-python@v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          cache: "pip"
 
       - name: Cache uv
         uses: actions/cache@v4
@@ -411,7 +514,7 @@ jobs:
         uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.13"
-          cache: 'pip'
+          cache: "pip"
 
       - name: Install security tools
         run: python -m pip install bandit[toml] safety pip-audit
