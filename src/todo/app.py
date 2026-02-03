@@ -71,7 +71,8 @@ def update_todo(todo_title: TodoItem, data: TodoItem) -> TodoItem | Response:
             todo.title = data.title
             todo.done = data.done
             a = ""
-            b = ""            
+            b = ""        
+            a + b + 1    
             return data
     return Response(
         content=f"Todo item with title {todo_title} does not exists.",
