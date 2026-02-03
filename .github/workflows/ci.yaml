@@ -22,7 +22,7 @@ jobs:
             - name: Install uv and ruff
               run: |
                 python -m pip install -U pip uv && \
-                  uv install ruff mypy --system
+                  uv pip install ruff mypy --system
             - name: Format with Ruff
               run: uv run ruff format .
             - name: Lint with Ruff
