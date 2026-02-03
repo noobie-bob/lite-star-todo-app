@@ -1,0 +1,54 @@
+# .pre-commit-config.yaml
+---
+default_language_version:
+    python: python3.13 # Add your python version here during local development, minimum 3.9+ for pre-commit v6+
+exclude: ^$
+fail_fast: false
+default_stages:
+    - pre-commit
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v6.0.0
+      hooks:
+          - id: trailing-whitespace
+          - id: end-of-file-fixer
+          - id: check-yaml
+          - id: check-added-large-files
+          - id: check-toml
+          - id: check-json
+          - id: debug-statements
+          - id: double-quote-string-fixer
+            exclude_types: [python, pyi, jupyter] # Exclude python files to avoid conflict with ruff
+          - id: name-tests-test
+            types:
+                - file
+                - python
+          - id: pretty-format-json
+            types:
+                - file
+            files: \.(json|gprof|wprof|tspec|rspec|hspec|vprof)$
+            args:
+                - --autofix
+                - --indent=4
+                - --no-sort-keys
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.14.14
+      hooks:
+          # Run the linter.
+          - id: ruff-check
+            args: [--fix]
+            types_or: [python, pyi]
+          # Run the formatter.
+          - id: ruff-format
+            types_or: [python, pyi]
+    - repo: https://github.com/pre-commit/mirrors-mypy
+      rev: v1.19.1
+      hooks:
+          - id: mypy
+            types_or: [python, pyi]
+            additional_dependencies:
+                - types-requests # needed for type checking requests package
+    - repo: https://github.com/gitleaks/gitleaks
+      rev: v8.30.0
+      hooks:
+          - id: gitleaks

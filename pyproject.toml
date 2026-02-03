@@ -1,0 +1,105 @@
+[project]
+name = "todo"
+version = "0.1.0"
+description = "TODO app"
+readme = "README.md"
+authors = [
+    { name = "noobie-bob", email = "blah-blah@email.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "litestar>=2.19.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.28,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "pre-commit>=4.5.1",
+]
+tests = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+]
+type-checks = [
+    "mypy>=1.19.1",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.mypy]
+python_version = "3.13"
+
+
+########### new changes
+[tool.bandit]
+targets = ["src"]
+exclude_dirs = [
+    "/tests",
+    "/.venv",
+    "/venv",
+]
+skips = [
+    # B101: Test for use of assert - OK in tests
+    # B601: Paramiko use - if you use it
+]
+severity = "medium"
+
+[tool.bandit.assert_used]
+skips = ["*/test_*.py", "*/*_test.py"]
+
+## Pytest
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# Coverage settings
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--showlocals",
+    "--tb=short",
+]
+
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+# Minimum coverage percentage
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "@abc.abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
