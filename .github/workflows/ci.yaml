@@ -397,7 +397,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install -U pip uv
-          uv sync --no-dev --extra mypy --system
+          uv sync --no-dev --extra mypy
 
       - name: Run mypy with annotations
         run: |
@@ -439,7 +439,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install -U pip uv
-          uv sync --group tests --system --no-dev
+          uv sync --group tests --no-dev
 
       - name: Run tests with coverage
         run: |
