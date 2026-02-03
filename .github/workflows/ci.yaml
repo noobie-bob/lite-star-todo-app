@@ -34,8 +34,12 @@ jobs:
 
             // Wait up to 10 minutes for fast-checks to complete
             const maxWaitTime = 10 * 60 * 1000; // 10 minutes
-            const pollInterval = 10000; // 10 seconds
+            const pollInterval = 2000; // 2 seconds
             const startTime = Date.now();
+
+            // Initially poll for 6 seconds
+            const initialPollTime = 6000; // 6 seconds
+            setTimeout(() => {}, initialPollTime);
 
             while (Date.now() - startTime < maxWaitTime) {
               // Get all workflow runs for this commit
@@ -398,7 +402,7 @@ jobs:
         run: |
           python -m pip install -U pip uv
           export UV_PROJECT_ENVIRONMENT=$(python -c 'import sys; print(sys.prefix)')
-          uv sync --no-dev --group type-checks
+          uv sync --no-dev --group type-
 
       - name: Run mypy with annotations
         run: |
