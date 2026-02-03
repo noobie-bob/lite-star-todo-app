@@ -14,12 +14,16 @@ jobs:
   pre-commit:
     name: Pre-commit Checks
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.1
         with:
           # For PRs, fetch the latest commit (after potential auto-fix from fast-checks)
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
@@ -36,8 +40,145 @@ jobs:
       - name: Install pre-commit
         run: python -m pip install pre-commit
 
-      - name: Run pre-commit on all files
-        run: pre-commit run --all-files --show-diff-on-failure
+      - name: Run pre-commit (first attempt)
+        id: precommit_first
+        continue-on-error: true
+        run: |
+          echo "Running pre-commit on all files..."
+          pre-commit run --all-files --show-diff-on-failure
+
+      - name: Check for changes after first run
+        id: changes_first
+        if: steps.precommit_first.outcome == 'failure'
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes detected after pre-commit"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Changes detected after pre-commit:"
+            git diff --stat
+          fi
+
+      - name: Commit pre-commit auto-fixes
+        if: steps.precommit_first.outcome == 'failure' && steps.changes_first.outputs.changed == 'true' && github.event_name == 'pull_request'
+        uses: stefanzweifel/git-auto-commit-action@v7.1.0
+        with:
+          commit_message: "style: auto-fix pre-commit issues"
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fail on push events if pre-commit made changes
+        if: steps.precommit_first.outcome == 'failure' && steps.changes_first.outputs.changed == 'true' && github.event_name == 'push'
+        run: |
+          echo "::error::Pre-commit checks failed on push to protected branch. Pre-commit hooks must be run before pushing."
+          echo "::error::Please run 'pre-commit run --all-files' locally and commit the fixes."
+          exit 1
+
+      - name: Run pre-commit (second attempt - verification)
+        id: precommit_second
+        if: steps.precommit_first.outcome == 'failure' && steps.changes_first.outputs.changed == 'true'
+        continue-on-error: true
+        run: |
+          echo "Re-running pre-commit to verify fixes..."
+          pre-commit run --all-files --show-diff-on-failure
+
+      - name: Notify user about successful auto-fix
+        if: steps.precommit_first.outcome == 'failure' && steps.changes_first.outputs.changed == 'true' && steps.precommit_second.outcome == 'success' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ✅ Pre-commit Auto-fix Applied
+            
+            **Pre-commit hooks have automatically fixed issues.**
+            
+            ### What happened?
+            - 🔧 Pre-commit hooks ran and fixed auto-fixable issues
+            - ✅ Changes have been committed to your PR branch
+            
+            ### What you need to do:
+            Please pull the latest changes to your local branch:
+            \`\`\`bash
+            git pull --rebase
+            \`\`\`
+            
+            ### Next steps:
+            - Your PR has been updated with the fixes
+            - The CI pipeline will continue with the remaining checks
+            - All checks should pass now ✨`
+            })
+
+      - name: Notify user about manual fix needed
+        if: steps.precommit_first.outcome == 'failure' && (steps.changes_first.outputs.changed == 'false' || steps.precommit_second.outcome == 'failure') && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ⚠️ Pre-commit Checks Failed - Manual Fix Required
+            
+            **Some pre-commit issues require manual intervention.**
+            
+            ### What you need to do:
+            
+            #### Option 1: Install and run pre-commit locally (Recommended)
+            \`\`\`bash
+            # Install pre-commit
+            pip install pre-commit
+            
+            # Install the git hooks
+            pre-commit install
+            
+            # Run on all files
+            pre-commit run --all-files
+            
+            # Review the changes
+            git diff
+            
+            # Commit the fixes
+            git add .
+            git commit -m "fix: resolve pre-commit issues"
+            git push
+            \`\`\`
+            
+            #### Option 2: Quick fix (if you don't want to install pre-commit)
+            \`\`\`bash
+            # Format code
+            ruff format .
+            
+            # Fix linting issues
+            ruff check --fix .
+            
+            # Run mypy
+            mypy src
+            
+            # Commit and push
+            git add .
+            git commit -m "fix: resolve linting and type issues"
+            git push
+            \`\`\`
+            
+            ### Why pre-commit is recommended:
+            - ⚡ Catches issues before you push
+            - 🔧 Auto-fixes most formatting issues
+            - 🛡️ Includes security checks (gitleaks)
+            - ✅ Ensures consistency across the team
+            
+            ### Need help?
+            Check the pre-commit output above for specific errors, or ask a maintainer for assistance.`
+            })
+
+      - name: Fail if pre-commit issues remain
+        if: steps.precommit_first.outcome == 'failure' && (steps.changes_first.outputs.changed == 'false' || steps.precommit_second.outcome == 'failure')
+        run: |
+          echo "::error::Pre-commit checks failed and could not be auto-fixed. Please fix manually."
+          exit 1
 
   type-check:
     name: Type Check (mypy)
