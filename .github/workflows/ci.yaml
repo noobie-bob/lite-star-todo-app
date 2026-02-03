@@ -18,19 +18,9 @@ jobs:
             - name: Set up Python
               uses: actions/setup-python@v6.2.0
               with:
-                python-version: "3.13"
-            - name: Cache uv and pip
-              uses: actions/cache@v5.0.3
-              with:
-                path: |
-                  ~/.cache/uv
-                key: uv-pip-${{ runner.os }}-${{ hashFiles('**/uv.lock', '**/pyproject.toml') }}
-                restore-keys: |
-                  uv-pip-${{ runner.os }}-
+                python-version: "3.13"            
             - name: Install uv and ruff
-              run: |
-                  python -m pip install -U pip uv \
-                    && uv sync --no-dev && uv pip install --system ruff mypy
+              run: python -m pip install -U pip uv                    
             - name: Format with Ruff
               run: uv run ruff format .
             - name: Lint with Ruff
@@ -43,15 +33,6 @@ jobs:
                 else
                   echo "changed=true" >> "$GITHUB_OUTPUT"
                 fi
-            - name: Cache mypy cache
-              uses: actions/cache@v5.0.3
-              with:
-                path: .mypy_cache
-                key: mypy-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/*.py') }}
-                restore-keys: |
-                  mypy-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-
-            - name: Run mypy
-              run: uv run mypy --incremental --show-error-codes --pretty src
             - name: Git Auto Commit   
               if: ${{ github.event_name == 'push' && steps.changes.outputs.changed == 'true' }}                         
               uses: stefanzweifel/git-auto-commit-action@v7.1.0
@@ -62,4 +43,9 @@ jobs:
               uses: mshick/add-pr-comment@v2
               with:
                 message: |
-                  **Ruff auto-fix with lint/format has been done, please perform git pull locally**
+                  **Ruff auto-fix with lint/format has been done, please perform git pull --rebase locally**          
+            - name: Run mypy with annotations
+              run: |
+                echo '::add-matcher::.github/mypy-matcher.json'
+                uv run mypy --show-error-codes --show-column-numbers src
+                echo '::remove-matcher owner=mypy::'
