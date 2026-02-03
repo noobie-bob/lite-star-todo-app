@@ -214,7 +214,7 @@ jobs:
 
       - name: Run mypy with annotations
         run: |
-          echo '::add-matcher::.github/mypy-matcher.json'
+          echo '::add-matcher::.github/workflows/mypy-matcher.json'
           uv run mypy --show-error-codes --show-column-numbers src
           echo '::remove-matcher owner=mypy::'
 
