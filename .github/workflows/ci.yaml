@@ -2,9 +2,9 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -102,9 +102,9 @@ jobs:
             
             ### What you need to do:
             Please pull the latest changes to your local branch:
-            \`\`\`bash
+            ~~~bash
             git pull --rebase
-            \`\`\`
+            ~~~
             
             ### Next steps:
             - Your PR has been updated with the fixes
@@ -128,7 +128,7 @@ jobs:
             ### What you need to do:
             
             #### Option 1: Install and run pre-commit locally (Recommended)
-            \`\`\`bash
+            ~~~bash
             # Install pre-commit
             pip install pre-commit
             
@@ -145,10 +145,10 @@ jobs:
             git add .
             git commit -m "fix: resolve pre-commit issues"
             git push
-            \`\`\`
+            ~~~
             
             #### Option 2: Quick fix (if you don't want to install pre-commit)
-            \`\`\`bash
+            ~~~bash
             # Format code
             ruff format .
             
@@ -162,7 +162,7 @@ jobs:
             git add .
             git commit -m "fix: resolve linting and type issues"
             git push
-            \`\`\`
+            ~~~
             
             ### Why pre-commit is recommended:
             - ⚡ Catches issues before you push

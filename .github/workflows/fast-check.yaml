@@ -82,14 +82,14 @@ jobs:
                   **Ruff has automatically fixed formatting and linting issues.**
 
                   ### What happened?
-                  - 🎨 Code formatting applied (`ruff format`)
-                  - 🔧 Auto-fixable lint issues resolved (`ruff check --fix`)
+                  - 🎨 Code formatting applied (ruff format)
+                  - 🔧 Auto-fixable lint issues resolved (ruff check --fix)
 
                   ### What you need to do:
                   Please pull the latest changes to your local branch:
-                  ```bash
+                  ~~~bash
                   git pull --rebase
-                  ```
+                  ~~~
 
                   ### Next steps:
                   - The CI pipeline will now run pre-commit checks and tests
@@ -134,36 +134,36 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `
-            ## ⚠️ Auto-fix Failed
+                  ## ⚠️ Auto-fix Failed
 
-            **Some issues require manual intervention.**
+                  **Some issues require manual intervention.**
 
-            ### What you need to do:
-            Please run the following commands locally:
-            ```bash
-            # Format your code
-            ruff format .
+                  ### What you need to do:
+                  Please run the following commands locally:
+                  ~~~bash
+                  # Format your code
+                  ruff format .
 
-            # Fix linting issues
-            ruff check --fix .
+                  # Fix linting issues
+                  ruff check --fix .
 
-            # Check for remaining issues
-            ruff check .
+                  # Check for remaining issues
+                  ruff check .
 
-            # Commit and push
-            git add .
-            git commit -m "fix: resolve ruff format and lint issues"
-            git push
-            ```
+                  # Commit and push
+                  git add .
+                  git commit -m "fix: resolve ruff format and lint issues"
+                  git push
+                  ~~~
 
-            ### Alternative: Use pre-commit hooks
-            Install pre-commit hooks to catch these issues before pushing:
-            ```bash
-            pip install pre-commit
-            pre-commit install
-            pre-commit run --all-files
-            ```
+                  ### Alternative: Use pre-commit hooks
+                  Install pre-commit hooks to catch these issues before pushing:
+                  ~~~bash
+                  pip install pre-commit
+                  pre-commit install
+                  pre-commit run --all-files
+                  ~~~
 
-            After fixing locally, push your changes and this check will re-run automatically.
-            `,
+                  After fixing locally, push your changes and this check will re-run automatically.
+                `,
               })
