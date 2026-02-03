@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from litestar.status_codes import HTTP_403_FORBIDDEN, HTTP_409_CONFLICT
 from litestar import Litestar, Response, delete, get, post, put
 from litestar.exceptions import NotFoundException
-from litestar.status_codes import HTTP_403_FORBIDDEN, HTTP_409_CONFLICT
 
 
 @dataclass(slots=True)
