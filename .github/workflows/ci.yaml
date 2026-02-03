@@ -1,0 +1,46 @@
+name: CI Pipeline
+on: [push, pull_request]
+
+jobs:
+    ruff-format:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            # Checkout the repository
+            - name: Checkout repository
+              uses: actions/checkout@v6.0.1
+              with:
+                ref: ${{ github.head_ref }}
+                # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
+                persist-credentials: true
+            - name: Ruff formatting
+              uses: astral-sh/ruff-action@v3.6.1
+              with:
+                args: "format ."
+            - name: Git Format Auto Commit
+              uses: stefanzweifel/git-auto-commit-action@v7.1.0
+              with:
+                commit_message: "style: auto-fix format issues" 
+    ruff-lint:
+        needs: ruff-format
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            # Checkout the repository
+            - name: Checkout repository
+              uses: actions/checkout@v6.0.1
+              with:
+                ref: ${{ github.head_ref }}
+                # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
+                persist-credentials: true
+            # Lint with Ruff
+            - name: Lint with Ruff
+              uses: astral-sh/ruff-action@v3.6.1
+              with:
+                args: "check --fix --output-format=github ."
+            - name: Git Lint Auto Commit
+              uses: stefanzweifel/git-auto-commit-action@v7.1.0
+              with:
+                commit_message: "style: auto-fix lint issues" 

@@ -1,0 +1,29 @@
+[project]
+name = "todo"
+version = "0.1.0"
+description = "TODO app"
+readme = "README.md"
+authors = [
+    { name = "noobie-bob", email = "blah-blah@email.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "litestar>=2.19.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.28,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "pre-commit>=4.5.1",
+    "ruff>=0.14.14",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.mypy]
+python_version = "3.13"
