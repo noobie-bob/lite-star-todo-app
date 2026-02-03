@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from litestar.exceptions import NotFoundException
-from litestar import Litestar, Response, delete, get, post, put 
+from litestar import Litestar, Response, delete, get, post, put
 from litestar.status_codes import HTTP_403_FORBIDDEN, HTTP_409_CONFLICT
 
 
@@ -71,8 +71,8 @@ def update_todo(todo_title: TodoItem, data: TodoItem) -> TodoItem | Response:
             todo.title = data.title
             todo.done = data.done
             a = ""
-            b = ""        
-            a + b + 1    
+            b = ""
+            a + b + 1
             return data
     return Response(
         content=f"Todo item with title {todo_title} does not exists.",
