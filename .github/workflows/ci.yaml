@@ -93,19 +93,19 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `## ✅ Pre-commit Auto-fix Applied
-            
+
             **Pre-commit hooks have automatically fixed issues.**
-            
+
             ### What happened?
             - 🔧 Pre-commit hooks ran and fixed auto-fixable issues
             - ✅ Changes have been committed to your PR branch
-            
+
             ### What you need to do:
             Please pull the latest changes to your local branch:
             ~~~bash
             git pull --rebase
             ~~~
-            
+
             ### Next steps:
             - Your PR has been updated with the fixes
             - The CI pipeline will continue with the remaining checks
@@ -122,54 +122,54 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `## ⚠️ Pre-commit Checks Failed - Manual Fix Required
-            
+
             **Some pre-commit issues require manual intervention.**
-            
+
             ### What you need to do:
-            
+
             #### Option 1: Install and run pre-commit locally (Recommended)
             ~~~bash
             # Install pre-commit
             pip install pre-commit
-            
+
             # Install the git hooks
             pre-commit install
-            
+
             # Run on all files
             pre-commit run --all-files
-            
+
             # Review the changes
             git diff
-            
+
             # Commit the fixes
             git add .
             git commit -m "fix: resolve pre-commit issues"
             git push
             ~~~
-            
+
             #### Option 2: Quick fix (if you don't want to install pre-commit)
             ~~~bash
             # Format code
             ruff format .
-            
+
             # Fix linting issues
             ruff check --fix .
-            
+
             # Run mypy
             mypy src
-            
+
             # Commit and push
             git add .
             git commit -m "fix: resolve linting and type issues"
             git push
             ~~~
-            
+
             ### Why pre-commit is recommended:
             - ⚡ Catches issues before you push
             - 🔧 Auto-fixes most formatting issues
             - 🛡️ Includes security checks (gitleaks)
             - ✅ Ensures consistency across the team
-            
+
             ### Need help?
             Check the pre-commit output above for specific errors, or ask a maintainer for assistance.`
             })
