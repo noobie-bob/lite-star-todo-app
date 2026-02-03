@@ -397,7 +397,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install -U pip uv
-          uv sync --no-dev --extra mypy
+          uv sync --no-dev --group type-checks
 
       - name: Run mypy with annotations
         run: |

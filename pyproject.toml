@@ -23,6 +23,9 @@ dev = [
 tests = [
     "pytest>=9.0.2",
 ]
+type-checks = [
+    "mypy>=1.19.1",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
