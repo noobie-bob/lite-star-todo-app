@@ -22,7 +22,7 @@ repos:
           - id: name-tests-test
             types:
                 - file
-            files: \.(json|gprof|wprof|tspec|rspec|hspec|vprof)$
+                - python
           - id: pretty-format-json
             types:
                 - file
